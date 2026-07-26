@@ -1,36 +1,13 @@
 // Copyright (c) 2024-Present The Yak Shaving Devs, MIT License
 
-import { Errors } from "../../constants.ts";
-import { getType } from "../../utils.ts";
+import { withNumber } from "../../type_helpers.ts";
 
-export const ABS = (val: number) => {
-    if (typeof val === "number") return Math.abs(val);
-    return {
-        [Errors.MethodNotDefinedForType]: `The ${val} of type ${getType(val)} has no method 'abs'. <value> | abs is only supported for Number`
-    };
-};
+export const ABS = (val: number) => withNumber(val, "abs", (n) => Math.abs(n));
 
-export const CEIL = (val: number) => {
-    if (typeof val === "number") return Math.ceil(val);
-    return {
-        [Errors.MethodNotDefinedForType]: `The ${val} of type ${getType(val)} has no method 'ceil'. <value> | ceil is only supported for Number`
-    };
-};
+export const CEIL = (val: number) => withNumber(val, "ceil", (n) => Math.ceil(n));
 
-export const FLOOR = (val: number) => {
-    if (typeof val === "number") return Math.floor(val);
-    return {
-        [Errors.MethodNotDefinedForType]: `The ${val} of type ${getType(val)} has no method 'floor'. <value> | floor is only supported for Number`
-    };
-};
+export const FLOOR = (val: number) => withNumber(val, "floor", (n) => Math.floor(n));
 
-export const ROUND = (val: number) => {
-    if (typeof val === "number") return Math.round(val);
-    return {
-        [Errors.MethodNotDefinedForType]: `The ${val} of type ${getType(val)} has no method 'round'. <value> | round is only supported for Number`
-    };
-};
+export const ROUND = (val: number) => withNumber(val, "round", (n) => Math.round(n));
 
-export const RANDOM = (_val: null) => {
-    return Math.random();
-};
+export const RANDOM = (_val: null) => Math.random();

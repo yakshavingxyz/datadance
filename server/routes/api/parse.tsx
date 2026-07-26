@@ -1,20 +1,15 @@
 import { Handlers } from "$fresh/server.ts";
-import { ddsToJson } from "../../../core/dds.ts";
+import { ddsToJson } from "../../../core/mod.ts";
+import { jsonResponse, errorResponse } from "../../utils/response.ts";
 
 export const handler: Handlers = {
   async POST(request) {
     try {
       const data = await request.text();
       const parsedTransformsData = ddsToJson(data);
-      return new Response(JSON.stringify(parsedTransformsData), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
+      return jsonResponse(parsedTransformsData);
     } catch (error) {
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+      return errorResponse(error, 400);
     }
   },
 };

@@ -3,11 +3,9 @@ import AceEditor from "ace-builds";
 import ace from "ace-builds";
 import Dracula from "ace-builds/src-noconflict/theme-dracula";
 import "ace-builds/src-noconflict/ext-language_tools";
-import { transform } from "../../../core/transform.ts";
-import { DataObject, MergeMethod } from "../../../core/types.ts";
-import { SerialOperations } from "../../../core/types.ts";
+import { transform, ddsToJson } from "../../../core/mod.ts";
+import type { DataObject, MergeMethod, SerialOperations } from "../../../core/mod.ts";
 import { highlight } from "../../utils/highlight_json.ts";
-import { ddsToJson } from "../../../core/dds.ts";
 import { IS_BROWSER } from "$fresh/runtime.ts";
 
 ace.config.set("basePath", "https://esm.sh/ace-builds@1.35.4/src-noconflict");

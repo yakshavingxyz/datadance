@@ -1,100 +1,104 @@
 import { DataObject, DdsDataObject, SerialOperations } from "./types.ts";
 
-export function jsonToDds(transformsJsonArray: SerialOperations, indent: number = 0): string {
-    let transformsDds = '';
-    const spaces = '  '; // 2 spaces for indentation
+export function jsonToDds(transforms: SerialOperations, indent: number = 0): string {
+  const spaces = "  ";
+  let result = "";
 
-    transformsJsonArray.forEach(item => {
-        if (typeof item === 'object' && !Array.isArray(item)) {
-            for (const key in item) {
-                if (typeof item[key] === 'object' && !Array.isArray(item[key])) {
-                    transformsDds += `${spaces.repeat(indent)}${key}:\n`;
-                    transformsDds += jsonToDds([item[key]], indent + 1);
-                } else if (Array.isArray(item[key])) {
-                    transformsDds += `${spaces.repeat(indent)}${key}:\n`;
-                    item[key].forEach(subItem => {
-                        if (typeof subItem === 'object') {
-                            transformsDds += `${spaces.repeat(indent + 1)}  ${jsonToDds([subItem], indent + 2).trim()}\n`;
-                        } else {
-                            transformsDds += `${spaces.repeat(indent + 1)}  ${subItem}\n`;
-                        }
-                    });
-                } else {
-                    transformsDds += `${spaces.repeat(indent)}${key}: ${item[key]}\n`;
-                }
-            }
+  for (const item of transforms) {
+    if (typeof item !== "object" || Array.isArray(item)) continue;
+
+    for (const key in item) {
+      const value = item[key];
+
+      if (typeof value === "object" && !Array.isArray(value)) {
+        result += `${spaces.repeat(indent)}${key}:\n`;
+        result += jsonToDds([value], indent + 1);
+      } else if (Array.isArray(value)) {
+        result += `${spaces.repeat(indent)}${key}:\n`;
+        for (const subItem of value) {
+          if (typeof subItem === "object") {
+            result += `${spaces.repeat(indent + 1)}  ${jsonToDds([subItem], indent + 2).trim()}\n`;
+          } else {
+            result += `${spaces.repeat(indent + 1)}  ${subItem}\n`;
+          }
         }
-    });
-
-    return transformsDds;
-};
-
-export const ddsToJson = (transformsDds: string): SerialOperations => {
-    try {
-        const lines = transformsDds.split("\n");
-        const result: SerialOperations = [];
-        const stack = [{ indent: -1, object: result }];
-        let errorMessage = "";
-
-        lines.forEach((line, index) => {
-            const trimmedLine = line.trim();
-            if (trimmedLine) {
-                const indent = line.search(/\S/);
-                if (indent % 2 !== 0) {
-                    errorMessage = `Indentation error at line ${index + 1
-                        }: "${line}". Indentation must be in multiples of 2 spaces.`;
-                }
-                if (line.includes(`"`)) {
-                    errorMessage = `Error at line ${index + 1
-                        }: ${line}. " character is not allowed, use 'literal' to represent string literal.`;
-                }
-                if (!line.includes(`:`)) {
-                    errorMessage = `Error at line ${index + 1
-                        }: ${line}. Please provide a valid expression`;
-                }
-                const trimmedLineSplit = trimmedLine.split(":");
-                const key = trimmedLineSplit[0].trim();
-                const value = trimmedLineSplit
-                    .slice(1, trimmedLineSplit.length)
-                    .map((s) => s.trim())
-                    .join(":");
-
-                const regexForField = /[^\w\s_$]/;
-                if (regexForField.test(key)) {
-                    errorMessage = `Error at line ${index + 1
-                        }: ${line}. Field names can only use special characters _ and $`;
-                }
-
-                const newEntry = value ? { [key]: value } : { [key]: [] };
-
-                while (stack.length && stack[stack.length - 1].indent >= indent) {
-                    stack.pop();
-                }
-
-                if (stack.length === 0 || stack[stack.length - 1].indent >= indent) {
-                    errorMessage = `Indentation error at line ${index + 1}: "${line}"`;
-                }
-
-                const currentParent = stack[stack.length - 1].object;
-                currentParent.push(newEntry);
-
-                if (!value) {
-                    stack.push({ indent, object: newEntry[key] as SerialOperations });
-                }
-            }
-        });
-
-        if (errorMessage) {
-            return [{ error: errorMessage }];
-        } else {
-            return result;
-        }
-    } catch (error) {
-        console.error(`There was an error while parsing transforms : ${error}.`);
-        return [{ error: error }];
+      } else {
+        result += `${spaces.repeat(indent)}${key}: ${value}\n`;
+      }
     }
-};
+  }
 
-export const isDdsDataObject = (data: DataObject): data is DdsDataObject => {
-    return data.settings.transforms_syntax === "dds";
+  return result;
+}
+
+export function ddsToJson(dds: string): SerialOperations {
+  try {
+    const lines = dds.split("\n");
+    const result: SerialOperations = [];
+    const indentStack: Array<{ indent: number; target: SerialOperations }> = [
+      { indent: -1, target: result },
+    ];
+    let errorMessage = "";
+
+    for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+      const line = lines[lineIdx];
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      const indent = line.search(/\S/);
+      errorMessage = errorMessage || validateLine(line, trimmed, indent, lineIdx);
+      if (errorMessage) break;
+
+      const parts = trimmed.split(":");
+      const key = parts[0].trim();
+      const value = parts.slice(1).map((s) => s.trim()).join(":");
+
+      const entry = value ? { [key]: value } : { [key]: [] };
+
+      while (indentStack.length > 1 && indentStack[indentStack.length - 1].indent >= indent) {
+        indentStack.pop();
+      }
+
+      const parent = indentStack[indentStack.length - 1].target;
+      parent.push(entry);
+
+      if (!value) {
+        indentStack.push({ indent, target: entry[key] as SerialOperations });
+      }
+    }
+
+    if (errorMessage) {
+      return [{ error: errorMessage }];
+    }
+    return result;
+  } catch (error) {
+    return [{ error: error }];
+  }
+}
+
+function validateLine(
+  line: string,
+  trimmed: string,
+  indent: number,
+  lineIdx: number
+): string {
+  if (indent % 2 !== 0) {
+    return `Indentation error at line ${lineIdx + 1}: "${line}". Indentation must be in multiples of 2 spaces.`;
+  }
+  if (line.includes('"')) {
+    return `Error at line ${lineIdx + 1}: ${line}. " character is not allowed, use 'literal' to represent string literal.`;
+  }
+  if (!line.includes(":")) {
+    return `Error at line ${lineIdx + 1}: ${line}. Please provide a valid expression`;
+  }
+  const colonIndex = trimmed.indexOf(":");
+  const key = trimmed.slice(0, colonIndex).trim();
+  if (/[^\w\s_$]/.test(key)) {
+    return `Error at line ${lineIdx + 1}: ${line}. Field names can only use special characters _ and $`;
+  }
+  return "";
+}
+
+export function isDdsDataObject(data: DataObject): data is DdsDataObject {
+  return data.settings.transforms_syntax === "dds";
 }

@@ -493,9 +493,9 @@ Deno.test("PARSE_JSON parses JSON string", () => {
 });
 
 Deno.test("PARSE_JSON returns error for invalid JSON", () => {
-  const result = _PARSE_JSON("invalid json");
+  const result = _PARSE_JSON("invalid json") as Record<string, string>;
   assertEquals(typeof result, "object");
-  assert((result as Record<string, string>)["JsonParseError"] !== undefined);
+  assert(result["JsonParseError"] !== undefined);
 });
 
 Deno.test("PARSE_JSON returns error for non-string input", () => {

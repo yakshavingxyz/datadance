@@ -1,7 +1,7 @@
 // Copyright (c) 2024-Present The Yak Shaving Devs, MIT License
 
 import { parseArgs } from "@std/cli/parse-args";
-import { transform } from "../core/transform.ts";
+import { transform } from "../core/mod.ts";
 import { printHelp } from "./help.ts";
 
 const main = async (cliArguments: string[]): Promise<void> => {

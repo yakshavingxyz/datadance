@@ -1,44 +1,24 @@
 import { Handlers } from "$fresh/server.ts";
-import { isValidEmail } from "../../utils/data_validation.ts";
-import KvSingleton from "../../utils/kv_instance.ts";
+import { jsonResponse, withKv, requireEmail } from "../../utils/response.ts";
 
 export const handler: Handlers = {
   async DELETE(request) {
-    const kv = await KvSingleton.getInstance();
-    try {
+    return withKv(async (kv) => {
       const requestData = await request.json();
-      const { emailId } = requestData;
+      const email = requireEmail(requestData);
+      if (!email) throw new Error(`Invalid email Id : ${requestData.emailId}`);
 
-      if (!isValidEmail(emailId)) {
-        throw new Error(`Invalid email Id : ${emailId}`);
-      }
-
-      const iter = kv.list<string>({ prefix: [emailId] });
+      const iter = kv.list<string>({ prefix: [email] });
       const transforms = [];
       for await (const res of iter) transforms.push(res);
 
-      for (let idx = 0; idx < transforms.length; idx++) {
-        const transformName = transforms[idx].key[1];
-        await kv.delete([emailId, transformName]);
+      for (const transform of transforms) {
+        await kv.delete([email, transform.key[1]]);
       }
 
-      return new Response(
-        JSON.stringify(
-          {
-            "status":
-              `All transforms created by user ${emailId} are deleted successfully`,
-          },
-        ),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    } catch (error) {
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
+      return jsonResponse({
+        status: `All transforms created by user ${email} are deleted successfully`,
       });
-    }
+    });
   },
 };

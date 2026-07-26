@@ -1,38 +1,23 @@
 import { Handlers } from "$fresh/server.ts";
-import { isValidEmail } from "../../utils/data_validation.ts";
-import KvSingleton from "../../utils/kv_instance.ts";
+import { jsonResponse, withKv, requireEmail } from "../../utils/response.ts";
 
 export const handler: Handlers = {
   async POST(request) {
-    const kv = await KvSingleton.getInstance();
-    try {
+    return withKv(async (kv) => {
       const requestData = await request.json();
-      const { transformName, settings, emailId, transforms } = requestData;
+      const email = requireEmail(requestData);
+      if (!email) throw new Error(`Invalid email Id : ${requestData.emailId}`);
 
-      if (!isValidEmail(emailId)) {
-        throw new Error(`Invalid email Id : ${emailId}`);
-      }
-
-      const result = await kv.set([emailId, transformName], {
-        settings: settings,
-        transforms: transforms,
+      const { transformName, settings, transforms } = requestData;
+      const result = await kv.set([email, transformName], {
+        settings,
+        transforms,
       });
 
-      return new Response(
-        JSON.stringify({
-          status: "The transforms are saved successfully!...",
-          versionstamp: result.versionstamp,
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    } catch (error) {
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
+      return jsonResponse({
+        status: "The transforms are saved successfully!...",
+        versionstamp: result.versionstamp,
       });
-    }
+    });
   },
 };

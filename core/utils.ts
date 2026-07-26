@@ -1,101 +1,89 @@
-// Copyright (c) 2024-Present The Yak Shaving Devs, MIT License
-
 import { Errors } from "./constants.ts";
 import { DateTimeFormatType, ErrorObject, PlainObject } from "./types.ts";
-import { DateTime } from 'luxon';
+import { DateTime } from "luxon";
 
 export const isRegExpExpression = (expression: string) => {
-    try {
-        new RegExp(expression);
-        return true;
-    }
-    catch (_error) {
-        return false;
-    }
-}
-
-export const getType = (value: any) => {
-    if (typeof value === "string") {
-        return "String";
-    } else if (typeof value === "number") {
-        return "Number";
-    } else if (typeof value === "boolean") {
-        return "Boolean";
-    } else if (typeof value === "object" && Array.isArray(value)) {
-        return "Array";
-    } else if (typeof value === "object" && value !== null) {
-        return "Object";
-    } else if (typeof value === "undefined") {
-        return "undefined";
-    } else if (value === null) {
-        return "null";
-    }
-
+  try {
+    new RegExp(expression);
+    return true;
+  } catch {
+    return false;
+  }
 };
 
+const TYPE_NAMES: Record<string, string> = {
+  string: "String",
+  number: "Number",
+  boolean: "Boolean",
+  object: "Object",
+  undefined: "undefined",
+};
 
-export const convertDateTime = (dateString: string, fromFormat: DateTimeFormatType, toFormat: DateTimeFormatType): string | ErrorObject => {
-    let date: DateTime;
+export const getType = (value: unknown): string | undefined => {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "Array";
+  return TYPE_NAMES[typeof value];
+};
 
-    // Parse the date string based on the "from" format
-    switch (fromFormat) {
-        case 'ISO':
-            date = DateTime.fromISO(dateString, { "setZone": true });
-            break;
-        case 'RFC2822':
-            date = DateTime.fromRFC2822(dateString, { "setZone": true });
-            break;
-        case 'SQL':
-            date = DateTime.fromSQL(dateString, { "setZone": true });
-            break;
-        case 'HTTP':
-            date = DateTime.fromHTTP(dateString, { "setZone": true });
-            break;
-        case 'Millis':
-            date = DateTime.fromMillis(parseInt(dateString, 10));
-            break;
-        default:
-            return { [Errors.InvalidFromDateTimeFormat]: `Unsupported fromFormat "${fromFormat}"` };
-    }
+const DATE_PARSERS: Record<string, (s: string) => DateTime> = {
+  ISO: (s) => DateTime.fromISO(s, { setZone: true }),
+  RFC2822: (s) => DateTime.fromRFC2822(s, { setZone: true }),
+  SQL: (s) => DateTime.fromSQL(s, { setZone: true }),
+  HTTP: (s) => DateTime.fromHTTP(s, { setZone: true }),
+  Millis: (s) => DateTime.fromMillis(parseInt(s, 10)),
+};
 
-    // Check if the date is valid
-    if (!date.isValid) {
-        return { [Errors.InvalidDateTimeString]: `Invalid date time string "${dateString}". Reason: ${date.invalidReason}` };
-    }
+const DATE_FORMATTERS: Record<string, (d: DateTime) => string | null> = {
+  ISO: (d) => d.toISO(),
+  RFC2822: (d) => d.toRFC2822(),
+  SQL: (d) => d.toSQL(),
+  HTTP: (d) => d.toHTTP(),
+  Millis: (d) => d.toMillis().toString(),
+};
 
-    // Convert the DateTime object to the desired "to" format
-    switch (toFormat) {
-        case 'ISO':
-            return date.toISO() || 'Error: Failed to convert to ISO format';
-        case 'RFC2822':
-            return date.toRFC2822() || 'Error: Failed to convert to RFC2822 format';
-        case 'SQL':
-            return date.toSQL() || 'Error: Failed to convert to SQL format';
-        case 'HTTP':
-            return date.toHTTP() || 'Error: Failed to convert to HTTP format';
-        case 'Millis':
-            return date.toMillis().toString();
-        default:
-            return { [Errors.InvalidToDateTimeFormat]: `Error: Unsupported toFormat "${toFormat}"` };
-    }
+export const convertDateTime = (
+  dateString: string,
+  fromFormat: DateTimeFormatType,
+  toFormat: DateTimeFormatType
+): string | ErrorObject => {
+  const parse = DATE_PARSERS[fromFormat];
+  if (!parse) {
+    return { [Errors.InvalidFromDateTimeFormat]: `Unsupported fromFormat "${fromFormat}"` };
+  }
+
+  const date = parse(dateString);
+
+  if (!date.isValid) {
+    return {
+      [Errors.InvalidDateTimeString]:
+        `Invalid date time string "${dateString}". Reason: ${date.invalidReason}`,
+    };
+  }
+
+  const format = DATE_FORMATTERS[toFormat];
+  if (!format) {
+    return { [Errors.InvalidToDateTimeFormat]: `Error: Unsupported toFormat "${toFormat}"` };
+  }
+
+  return format(date) || `Error: Failed to convert to ${toFormat} format`;
 };
 
 export const isValidDateTime = (dateTimeString: string) => {
-    return DateTime.fromISO(dateTimeString, { setZone: true }).isValid;
+  return DateTime.fromISO(dateTimeString, { setZone: true }).isValid;
 };
 
 export const symmetricDifference = (setA: Set<string>, setB: Set<string>): Set<string> => {
-    const difference = new Set(setA);
-    for (const elem of setB) {
-        if (difference.has(elem)) {
-            difference.delete(elem);
-        } else {
-            difference.add(elem);
-        }
+  const difference = new Set(setA);
+  for (const elem of setB) {
+    if (difference.has(elem)) {
+      difference.delete(elem);
+    } else {
+      difference.add(elem);
     }
-    return difference;
+  }
+  return difference;
 };
 
 export const isObject = (value: unknown): value is PlainObject => {
-    return value !== null && typeof value === "object" && !Array.isArray(value);
-  };
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+};

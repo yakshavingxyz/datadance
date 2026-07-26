@@ -1,4 +1,4 @@
-import { transform, _isTemporaryField, _isSubTransformBlock, _cleanTemporaryFields, _updateDerivedState } from "../transform.ts";
+import { transform, isTemporaryField, isSubTransformBlock, cleanTemporaryFields, updateDerivedState } from "../transform.ts";
 import { assertEquals, assert } from "$std/assert/mod.ts";
 
 Deno.test("transform with simple pipe expression", async () => {
@@ -163,36 +163,36 @@ Deno.test("transform with math operations", async () => {
 // Internal helper tests
 // ------------------------------------------------
 
-Deno.test("_isTemporaryField detects temporary fields", () => {
-  assertEquals(_isTemporaryField("_temp"), true);
-  assertEquals(_isTemporaryField("_$block"), false);
-  assertEquals(_isTemporaryField("normal"), false);
+Deno.test("isTemporaryField detects temporary fields", () => {
+  assertEquals(isTemporaryField("_temp"), true);
+  assertEquals(isTemporaryField("_$block"), false);
+  assertEquals(isTemporaryField("normal"), false);
 });
 
-Deno.test("_isSubTransformBlock detects sub-transform blocks", () => {
-  assertEquals(_isSubTransformBlock("_$func"), true);
-  assertEquals(_isSubTransformBlock("_temp"), false);
-  assertEquals(_isSubTransformBlock("normal"), false);
+Deno.test("isSubTransformBlock detects sub-transform blocks", () => {
+  assertEquals(isSubTransformBlock("_$func"), true);
+  assertEquals(isSubTransformBlock("_temp"), false);
+  assertEquals(isSubTransformBlock("normal"), false);
 });
 
-Deno.test("_cleanTemporaryFields removes temp fields", () => {
-  const result = _cleanTemporaryFields({ a: 1, _temp: 2, b: 3 });
+Deno.test("cleanTemporaryFields removes temp fields", () => {
+  const result = cleanTemporaryFields({ a: 1, _temp: 2, b: 3 });
   assertEquals(result, { a: 1, b: 3 });
 });
 
-Deno.test("_cleanTemporaryFields preserves non-temp fields", () => {
-  const result = _cleanTemporaryFields({ a: 1, b: 2 });
+Deno.test("cleanTemporaryFields preserves non-temp fields", () => {
+  const result = cleanTemporaryFields({ a: 1, b: 2 });
   assertEquals(result, { a: 1, b: 2 });
 });
 
-Deno.test("_updateDerivedState sets value at path", () => {
+Deno.test("updateDerivedState sets value at path", () => {
   const target = { a: { b: {} } };
-  _updateDerivedState(target, { b: "val" }, ["a", "b"]);
+  updateDerivedState(target, { b: "val" }, ["a", "b"]);
   assertEquals(target.a.b, "val");
 });
 
-Deno.test("_updateDerivedState creates nested paths", () => {
+Deno.test("updateDerivedState creates nested paths", () => {
   const target = {};
-  _updateDerivedState(target, { b: "val" }, ["a", "b"]);
+  updateDerivedState(target, { b: "val" }, ["a", "b"]);
   assertEquals(target, { a: { b: "val" } });
 });

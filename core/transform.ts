@@ -1,12 +1,5 @@
 // Copyright (c) 2024-Present The Yak Shaving Devs, MIT License
 
-/**
- * Import the `mozjexl` object along with any custom transforms, 
- * such as `upper`, `forEach`, and others as needed.
- * 
- * These custom transforms extend the functionality of `mozjexl` 
- * by providing additional utilities.
- */
 import mozjexl from "./load_lib.ts";
 import { DataObject, ErrorObject, Expression, SerialOperations } from "./types.ts";
 import { Errors } from "./constants.ts";
@@ -16,250 +9,229 @@ export const transform = async (
   dataObject: DataObject
 ): Promise<Record<string, any> | ErrorObject> => {
   try {
-    let transforms: SerialOperations;
-
-    if (isDdsDataObject(dataObject)) {
-      transforms = ddsToJson(dataObject.transforms)
-    } else {
-      transforms = dataObject.transforms;
-    }
-
+    const transforms = parseTransforms(dataObject);
     const { input, settings } = dataObject;
+    const derived = dataObject.derived ?? { ...input };
+    const pathTrace = dataObject.pathTrace ?? [];
+    const isSubTransformation = dataObject.isSubTransformation ?? false;
 
-    const derived: Record<string, any> =
-      dataObject.derived !== undefined ? dataObject.derived : { ...input };
+    const output = await evaluateTransforms(
+      transforms,
+      { input, derived, pathTrace, isSubTransformation },
+      dataObject
+    );
 
-    const pathTrace: Array<string> =
-      dataObject.pathTrace !== undefined ? dataObject.pathTrace : [];
-
-    const isSubTransformation: boolean =
-      dataObject.isSubTransformation !== undefined
-        ? dataObject.isSubTransformation
-        : false;
-
-    const transformedOutput: Record<string, any> = {};
-
-    /**
-     * The `dataObjectClone` is utilized to enable the functionality 
-     * of nested sub-transformations.
-     * 
-     * By working on a cloned version of the data object, it ensures 
-     * that nested transformations are processed independently while 
-     * preserving the integrity of the original data structure.
-     */
-    const dataObjectClone = structuredClone(dataObject);
-    /**
-     * From the sub-transformations, we only retain the fields that were modified 
-     * (touched) during the process.
-     * 
-     * Retaining only the touched fields avoids the need for sanitizing the output 
-     * of sub-transformations, simplifying the overall workflow and ensuring clean results.
-     */
-    dataObjectClone.settings.merge_method = "transforms_only";
-    dataObjectClone.derived = derived;
-    dataObjectClone.pathTrace = pathTrace;
-    dataObjectClone.isSubTransformation = isSubTransformation;
-
-    for (const fieldTransformObject of transforms) {
-      /**
-       * To ensure transformations are evaluated in order, we restrict transforms 
-       * to be a list of JSON objects, where each object contains only one key.
-       * 
-       * The value of each key can either be:
-       * 1. A simple string expression, or
-       * 2. Another list of JSON objects, where each object also contains only one key.
-       * 
-       * This structure simplifies the evaluation process for both straightforward 
-       * and deeply nested transformations.
-       */
-      if (Object.keys(fieldTransformObject).length !== 1) {
-        console.error(
-          `%c${[Errors.InvalidTransform]} : In the transformation : --> ${JSON.stringify(
-            fieldTransformObject
-          )} <--,
-           there are more than one keys.`,
-          "color:red"
-        );
-        return { [Errors.InvalidTransform]: "Each transform has to have only one key" };
-      }
-
-      const field: string = Object.keys(fieldTransformObject)[0];
-      const expression: Expression = fieldTransformObject[field];
-
-      try {
-        if (_isSubTransformBlock(field)) {
-          /**
-           * Sub-transform blocks (fields starting with an underscore followed by a dollar sign, e.g., `_$`) 
-           * are not directly evaluated. Instead, they are added to the derived state for reference purposes.
-           *
-           * These sub-transform blocks, regardless of their nesting level, are only accessible at the root 
-           * level for referencing. This ensures a consistent way to access functions from derived state data throughout 
-           * the system.
-           */
-          derived[field] = expression;
-          continue;
-        }
-        if (Array.isArray(expression)) {
-          /**
-           * Handles cases where the expression represents a nested transformation.
-           * 
-           * Nested transformations involve processing a sub-structure within 
-           * the data, allowing for complex, hierarchical modifications to be 
-           * applied seamlessly.
-           */
-          let intermediateResultObject = {};
-          dataObjectClone.pathTrace.push(field); // adding parent field to pathTrace
-          dataObjectClone.isSubTransformation = true;
-          for (
-            let subTransformIndex = 0;
-            subTransformIndex < expression.length;
-            subTransformIndex++
-          ) {
-            dataObjectClone.transforms = [expression[subTransformIndex]];
-            const subFieldName = Object.keys(expression[subTransformIndex])[0];
-            const subResultObject = await transform(dataObjectClone);
-
-            dataObjectClone.pathTrace.push(subFieldName); // adding sub field to pathTrace
-            let subResult: Record<string, any> = {};
-            Object.keys(subResultObject).some((key) => {
-              if (Object.keys(Errors).includes(key)) {
-                Object.assign(subResult, {});
-                subResult[subFieldName] = subResultObject;
-              } else {
-                subResult = { ...subResultObject };
-              }
-            });
-
-            intermediateResultObject = {
-              ...intermediateResultObject,
-              ...subResult,
-            };
-            /**
-             * Updating the derived state involves placing the computed value 
-             * in the correct location within the derived state. 
-             * This ensures that the value is immediately available for use 
-             * wherever it is needed.
-             */
-            _updateDerivedState(dataObjectClone.derived, subResult, pathTrace);
-
-            dataObjectClone.pathTrace.pop(); // removing sub field from pathTrace
-          }
-
-          /**
-           * Temporary fields are excluded from the final transformed output JSON.
-           * 
-           * These fields serve a functional purpose during the transformation process, 
-           * aiding in the selection and deselection of specific fields without 
-           * impacting the resulting output.
-           */
-          transformedOutput[field] = _cleanTemporaryFields(intermediateResultObject);
-          dataObjectClone.pathTrace.pop(); // removing parent field from pathTrace
-          dataObjectClone.isSubTransformation = false;
-        } else {
-          /**
-           * Handles cases where the expression is a simple string.
-           * 
-           * Simple string expressions are evaluated directly, without the need 
-           * for additional processing or recursion, ensuring straightforward 
-           * transformations.
-           */
-          let result = await mozjexl.eval(expression, { input, derived });
-          if (result === undefined || result === null) {
-            result = {
-              [Errors.VariableNotInContext]: `The transform ${expression} uses variables not available in the context`,
-            };
-            console.error(
-              `%c${[Errors.VariableNotInContext]} : The expression : --> ${JSON.stringify(
-                expression
-              )} <--,
-           uses variables not available in the context.`,
-              "color:red"
-            );
-          }
-          /**
-           * When temporary fields are referenced elsewhere, 
-           * it is essential to remove these temporary variables 
-           * to maintain a clean and accurate state.
-           * 
-           * This ensures that temporary fields do not persist unnecessarily 
-           * or interfere with the final output.
-           */
-          if (!_isTemporaryField(field) || pathTrace.length > 0) transformedOutput[field] = typeof result === "object" && !Array.isArray(result) ? _cleanTemporaryFields(result) : result;
-          /**
-           * When working inside a sub-transformation, there is no need to explicitly 
-           * update the derived state of the parent with changes made within the 
-           * sub-transformation.
-           * 
-           * This is because the `_updateDerivedState()` function automatically handles 
-           * these updates once the recursive process is complete.
-           */
-          if (!isSubTransformation) derived[field] = result;
-        }
-      } catch (error) {
-        let formattedError = JSON.stringify(error);
-        if (formattedError === `{}`) {
-          formattedError = "The transforms contain an incomplete/invalid expression.";
-        }
-        const errorResult = { [Errors.TransformError]: formattedError };
-        console.error(`%c${[Errors.TransformError]}: ${JSON.stringify(errorResult)}`, "color:red");
-        if (!_isTemporaryField(field) || pathTrace.length > 0) transformedOutput[field] = errorResult;
-        if (!isSubTransformation) derived[field] = errorResult;
-      }
-    }
-
-    switch (settings.merge_method?.toLowerCase()) {
-      case "overwrite":
-        return { ...input, ...transformedOutput };
-      case "preserve":
-        return { ...input, transforms: transformedOutput };
-      case "transforms_only":
-        return transformedOutput;
-      default:
-        return { [Errors.InvalidMergeMethod]: "Invalid merge method" };
-    }
-  } catch (transformError) {
-    return { [Errors.TransformError]: transformError.toString() };
+    return applyMergeMethod(output, input, settings.merge_method);
+  } catch (error) {
+    return { [Errors.TransformError]: error.toString() };
   }
 };
 
-export const _updateDerivedState = (
+function parseTransforms(dataObject: DataObject): SerialOperations {
+  if (isDdsDataObject(dataObject)) {
+    return ddsToJson(dataObject.transforms);
+  }
+  return dataObject.transforms;
+}
+
+interface TransformContext {
+  input: Record<string, any>;
+  derived: Record<string, any>;
+  pathTrace: Array<string>;
+  isSubTransformation: boolean;
+}
+
+async function evaluateTransforms(
+  transforms: SerialOperations,
+  ctx: TransformContext,
+  originalDataObject: DataObject
+): Promise<Record<string, any>> {
+  const output: Record<string, any> = {};
+  const { derived, pathTrace, isSubTransformation } = ctx;
+
+  for (const transformEntry of transforms) {
+    const keys = Object.keys(transformEntry);
+    if (keys.length !== 1) {
+      const errorMsg = `${Errors.InvalidTransform}: Each transform must have exactly one key`;
+      console.error(`%c${errorMsg}`, "color:red");
+      return { [Errors.InvalidTransform]: errorMsg };
+    }
+
+    const field = keys[0];
+    const expression: Expression = transformEntry[field];
+
+    if (isSubTransformBlock(field)) {
+      derived[field] = expression;
+      continue;
+    }
+
+    try {
+      if (Array.isArray(expression)) {
+        const nestedResult = await evaluateNestedTransforms(
+          field,
+          expression,
+          ctx,
+          originalDataObject
+        );
+        output[field] = nestedResult;
+      } else {
+        const result = await evaluateSimpleExpression(expression, ctx);
+        if (!isTemporaryField(field) || pathTrace.length > 0) {
+          output[field] = cleanTemporaryFieldsFromResult(result);
+        }
+        if (!isSubTransformation) derived[field] = result;
+      }
+    } catch (error) {
+      handleTransformError(error, field, output, derived, isSubTransformation, pathTrace);
+    }
+  }
+
+  return output;
+}
+
+async function evaluateNestedTransforms(
+  parentField: string,
+  expressions: SerialOperations,
+  ctx: TransformContext,
+  originalDataObject: DataObject
+): Promise<Record<string, any>> {
+  const { derived, pathTrace } = ctx;
+  const dataObjectClone = structuredClone(originalDataObject);
+  dataObjectClone.settings.merge_method = "transforms_only";
+
+  pathTrace.push(parentField);
+
+  let intermediateResult: Record<string, any> = {};
+
+  for (const subEntry of expressions) {
+    const subField = Object.keys(subEntry)[0];
+    dataObjectClone.transforms = [subEntry];
+    dataObjectClone.derived = derived;
+    dataObjectClone.pathTrace = pathTrace;
+    dataObjectClone.isSubTransformation = true;
+
+    const subResultObject = await transform(dataObjectClone);
+
+    pathTrace.push(subField);
+
+    const subResult = extractSubResult(subResultObject, subField);
+    intermediateResult = { ...intermediateResult, ...subResult };
+
+    updateDerivedState(derived, subResult, pathTrace);
+
+    pathTrace.pop();
+  }
+
+  pathTrace.pop();
+  return cleanTemporaryFields(intermediateResult);
+}
+
+function extractSubResult(
+  resultObject: Record<string, any>,
+  subField: string
+): Record<string, any> {
+  const hasError = Object.keys(resultObject).some((key) =>
+    Object.keys(Errors).includes(key)
+  );
+  if (hasError) {
+    return { [subField]: resultObject };
+  }
+  return { ...resultObject };
+}
+
+async function evaluateSimpleExpression(
+  expression: string,
+  ctx: TransformContext
+): Promise<any> {
+  const result = await mozjexl.eval(expression, {
+    input: ctx.input,
+    derived: ctx.derived,
+  });
+  if (result === undefined || result === null) {
+    const errorMsg = {
+      [Errors.VariableNotInContext]:
+        `The transform ${expression} uses variables not available in the context`,
+    };
+    console.error(`%c${Errors.VariableNotInContext} : ${expression}`, "color:red");
+    return errorMsg;
+  }
+  return result;
+}
+
+function handleTransformError(
+  error: any,
+  field: string,
+  output: Record<string, any>,
+  derived: Record<string, any>,
+  isSubTransformation: boolean,
+  pathTrace: Array<string>
+) {
+  let formattedError = JSON.stringify(error);
+  if (formattedError === "{}") {
+    formattedError = "The transforms contain an incomplete/invalid expression.";
+  }
+  const errorResult = { [Errors.TransformError]: formattedError };
+  console.error(`%c${Errors.TransformError}: ${formattedError}`, "color:red");
+  if (!isTemporaryField(field) || pathTrace.length > 0) {
+    output[field] = errorResult;
+  }
+  if (!isSubTransformation) derived[field] = errorResult;
+}
+
+function cleanTemporaryFieldsFromResult(result: any): any {
+  if (typeof result === "object" && !Array.isArray(result)) {
+    return cleanTemporaryFields(result);
+  }
+  return result;
+}
+
+function applyMergeMethod(
+  transformedOutput: Record<string, any>,
+  input: Record<string, any>,
+  mergeMethod: string | undefined
+): Record<string, any> {
+  switch (mergeMethod?.toLowerCase()) {
+    case "overwrite":
+      return { ...input, ...transformedOutput };
+    case "preserve":
+      return { ...input, transforms: transformedOutput };
+    case "transforms_only":
+      return transformedOutput;
+    default:
+      return { [Errors.InvalidMergeMethod]: "Invalid merge method" };
+  }
+}
+
+export const updateDerivedState = (
   targetObject: Record<string, any>,
   sourceObject: Record<string, any>,
   pathTrace: Array<string>
 ) => {
-  let currentObject = targetObject;
+  let current = targetObject;
   pathTrace.forEach((path, index) => {
     if (index === pathTrace.length - 1) {
-      currentObject[path] = sourceObject[path];
+      current[path] = sourceObject[path];
     } else {
-      if (currentObject[path] === undefined) {
-        currentObject[path] = {};
-      }
-      currentObject = currentObject[path];
+      if (current[path] === undefined) current[path] = {};
+      current = current[path];
     }
   });
 };
 
-export const _isTemporaryField = (fieldName: string) => {
-  if (fieldName.startsWith("_") && !_isSubTransformBlock(fieldName)) {
-    return true;
-  }
-  return false;
+export const isTemporaryField = (fieldName: string): boolean => {
+  return fieldName.startsWith("_") && !isSubTransformBlock(fieldName);
 };
 
-export const _cleanTemporaryFields = (resultObject: Record<string,any>) => {
-  const cleanedResultObject: Record<string,any> = {};
+export const cleanTemporaryFields = (resultObject: Record<string, any>): Record<string, any> => {
+  const cleaned: Record<string, any> = {};
   for (const key in resultObject) {
-    if (!_isTemporaryField(key)) {
-      cleanedResultObject[key] = resultObject[key];
+    if (!isTemporaryField(key)) {
+      cleaned[key] = resultObject[key];
     }
   }
-  return cleanedResultObject;
+  return cleaned;
 };
 
-export const _isSubTransformBlock = (fieldName: string) => {
-  if (fieldName.startsWith("_$")) {
-    return true;
-  }
-  return false;
+export const isSubTransformBlock = (fieldName: string): boolean => {
+  return fieldName.startsWith("_$");
 };

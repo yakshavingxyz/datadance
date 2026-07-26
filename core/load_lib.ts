@@ -2,214 +2,97 @@
 
 // @ts-ignore "Mozjexl do not have any official or community built type definitions"
 import mozjexl from "mozjexl";
-
-import {
-  CAPITALIZE,
-  ENDS_WITH,
-  INDEX_OF_CHAR,
-  LENGTH,
-  LOWER,
-  LTRIM,
-  PAD_END,
-  PAD_START,
-  PARSE_FLOAT,
-  PARSE_INT,
-  REPLACE,
-  REPLACE_ALL,
-  REVERSE,
-  RTRIM,
-  SLUGIFY,
-  SPLIT,
-  STARTS_WITH,
-  SUBSTRING,
-  SWAP_CASE,
-  TO_BOOLEAN,
-  TRIM,
-  UNSLUGIFY,
-  UPPER
-} from "./lib/transforms/string_transforms.ts";
-import {
-  FOREACH,
-  JSONPATH,
-  PARSE_JSON,
-  TYPE,
-  UUID
-} from "./lib/transforms/misc_transforms.ts";
-import {
-  JOIN,
-  MAX,
-  MIN,
-  PLUCK,
-  POP,
-  PUSH,
-  RANGE,
-  RANGE_RIGHT,
-  REMOVE_DUPLICATES,
-  REVERSE_ARRAY,
-  SIZE,
-  SLICE,
-  SORT_ARRAY
-} from "./lib/transforms/array_transforms.ts";
-import {
-  DELETE,
-  ENTRIES,
-  GET,
-  HAS,
-  KEYS,
-  STRINGIFY,
-  VALUES,
-  DEEP_MERGE
-} from "./lib/transforms/object_transforms.ts";
-import {
-  ABS,
-  CEIL,
-  FLOOR,
-  RANDOM,
-  ROUND
-} from "./lib/transforms/number_transforms.ts";
-import {
-  CONVERT_DATE_TIME_FORMAT,
-  FORMAT_DATE_TIME,
-  GET_DAY,
-  GET_HOURS,
-  GET_MINUTES,
-  GET_MONTH,
-  GET_SECONDS,
-  GET_TIME_ZONE,
-  GET_YEAR,
-  NOW,
-  SET_DAY,
-  SET_HOURS,
-  SET_MINUTES,
-  SET_MONTH,
-  SET_SECONDS,
-  SET_TIME_ZONE,
-  SET_YEAR,
-  TO_LOCAL,
-  TO_MILLIS,
-  TO_UTC,
-  UTC_NOW
-} from "./lib/transforms/date_transforms.ts";
-import { EQUALS_IGNORE_CASE, STRICT_EQUALS } from "./lib/operators/custom_operators.ts";
 import { Errors } from "./constants.ts";
-import { getType } from "./utils.ts";
+import { withString } from "./type_helpers.ts";
 
+import {
+  CAPITALIZE, ENDS_WITH, INDEX_OF_CHAR, LENGTH, LOWER, LTRIM,
+  PAD_END, PAD_START, PARSE_FLOAT, PARSE_INT, REPLACE, REPLACE_ALL,
+  REVERSE, RTRIM, SLUGIFY, SPLIT, STARTS_WITH, SUBSTRING, SWAP_CASE,
+  TO_BOOLEAN, TRIM, UNSLUGIFY, UPPER,
+} from "./lib/transforms/string_transforms.ts";
 
-// Operators
-mozjexl.addBinaryOp("_=", 20, EQUALS_IGNORE_CASE)
-mozjexl.addBinaryOp("===", 20, STRICT_EQUALS)
+import {
+  FOREACH, JSONPATH, PARSE_JSON, TYPE, UUID,
+} from "./lib/transforms/misc_transforms.ts";
 
+import {
+  JOIN, MAX, MIN, PLUCK, POP, PUSH, RANGE, RANGE_RIGHT,
+  REMOVE_DUPLICATES, REVERSE_ARRAY, SIZE, SLICE, SORT_ARRAY,
+} from "./lib/transforms/array_transforms.ts";
 
-// String transforms
-mozjexl.addTransform("upper", UPPER);
-mozjexl.addTransform("lower", LOWER);
-mozjexl.addTransform("capitalize", CAPITALIZE);
-mozjexl.addTransform("swapCase", SWAP_CASE);
-mozjexl.addTransform("startsWith", STARTS_WITH);
-mozjexl.addTransform("endsWith", ENDS_WITH);
-mozjexl.addTransform("indexOfChar", INDEX_OF_CHAR);
-mozjexl.addTransform("trim", TRIM);
-mozjexl.addTransform("ltrim", LTRIM);
-mozjexl.addTransform("rtrim", RTRIM);
-mozjexl.addTransform("length", LENGTH);
-mozjexl.addTransform("replace", REPLACE);
-mozjexl.addTransform("replaceAll", REPLACE_ALL);
-mozjexl.addTransform("split", SPLIT);
-mozjexl.addTransform("substring", SUBSTRING);
-mozjexl.addTransform("padStart", PAD_START);
-mozjexl.addTransform("padEnd", PAD_END);
-mozjexl.addTransform("parseInt", PARSE_INT);
-mozjexl.addTransform("parseFloat", PARSE_FLOAT);
-mozjexl.addTransform("toBoolean", TO_BOOLEAN);
-mozjexl.addTransform("reverse", REVERSE);
-mozjexl.addTransform("slugify", SLUGIFY);
-mozjexl.addTransform("unslugify", UNSLUGIFY);
+import {
+  DELETE, DEEP_MERGE, ENTRIES, GET, HAS, KEYS, STRINGIFY, VALUES,
+} from "./lib/transforms/object_transforms.ts";
 
-// Misc transforms
-mozjexl.addTransform("forEach", FOREACH);
-mozjexl.addTransform("jsonpath", JSONPATH);
-mozjexl.addTransform("type", TYPE);
-mozjexl.addTransform("parseJson", PARSE_JSON);
-mozjexl.addTransform("UUID", UUID);
+import {
+  ABS, CEIL, FLOOR, RANDOM, ROUND,
+} from "./lib/transforms/number_transforms.ts";
 
-// Array transforms
-mozjexl.addTransform("pluck", PLUCK);
-mozjexl.addTransform("size", SIZE);
-mozjexl.addTransform("push", PUSH);
-mozjexl.addTransform("pop", POP);
-mozjexl.addTransform("join", JOIN);
-mozjexl.addTransform("slice", SLICE);
-mozjexl.addTransform("reverseArray", REVERSE_ARRAY);
-mozjexl.addTransform("sortArray", SORT_ARRAY);
-mozjexl.addTransform("range", RANGE);
-mozjexl.addTransform("rangeRight", RANGE_RIGHT);
-mozjexl.addTransform("removeDuplicates", REMOVE_DUPLICATES);
-mozjexl.addTransform("max", MAX);
-mozjexl.addTransform("min", MIN);
+import {
+  CONVERT_DATE_TIME_FORMAT, FORMAT_DATE_TIME, GET_DAY, GET_HOURS,
+  GET_MINUTES, GET_MONTH, GET_SECONDS, GET_TIME_ZONE, GET_YEAR,
+  NOW, SET_DAY, SET_HOURS, SET_MINUTES, SET_MONTH, SET_SECONDS,
+  SET_TIME_ZONE, SET_YEAR, TO_LOCAL, TO_MILLIS, TO_UTC, UTC_NOW,
+} from "./lib/transforms/date_transforms.ts";
 
-// Object transforms
-mozjexl.addTransform("keys", KEYS);
-mozjexl.addTransform("values", VALUES);
-mozjexl.addTransform("entries", ENTRIES);
-mozjexl.addTransform("get", GET);
-mozjexl.addTransform("has", HAS);
-mozjexl.addTransform("delete", DELETE);
-mozjexl.addTransform("stringify", STRINGIFY);
-mozjexl.addTransform("deepMerge", DEEP_MERGE);
+import { EQUALS_IGNORE_CASE, STRICT_EQUALS } from "./lib/operators/custom_operators.ts";
 
-// Number transforms
-mozjexl.addTransform("abs", ABS);
-mozjexl.addTransform("ceil", CEIL);
-mozjexl.addTransform("floor", FLOOR);
-mozjexl.addTransform("round", ROUND);
-mozjexl.addTransform("random", RANDOM);
+// Register custom operators
+mozjexl.addBinaryOp("_=", 20, EQUALS_IGNORE_CASE);
+mozjexl.addBinaryOp("===", 20, STRICT_EQUALS);
 
-// Date transforms
-mozjexl.addTransform("formatDateTime", FORMAT_DATE_TIME);
-mozjexl.addTransform("convertDateTimeFormat", CONVERT_DATE_TIME_FORMAT);
-mozjexl.addTransform("now", NOW);
-mozjexl.addTransform("utcNow", UTC_NOW);
-mozjexl.addTransform("toUTC", TO_UTC);
-mozjexl.addTransform("toLocal", TO_LOCAL);
-mozjexl.addTransform("toMillis", TO_MILLIS);
-mozjexl.addTransform("getSeconds", GET_SECONDS);
-mozjexl.addTransform("getTimeZone", GET_TIME_ZONE);
-mozjexl.addTransform("getMinutes", GET_MINUTES);
-mozjexl.addTransform("getHours", GET_HOURS);
-mozjexl.addTransform("getDay", GET_DAY);
-mozjexl.addTransform("getMonth", GET_MONTH);
-mozjexl.addTransform("getYear", GET_YEAR);
-mozjexl.addTransform("setSeconds", SET_SECONDS);
-mozjexl.addTransform("setTimeZone", SET_TIME_ZONE);
-mozjexl.addTransform("setMinutes", SET_MINUTES);
-mozjexl.addTransform("setHours", SET_HOURS);
-mozjexl.addTransform("setDay", SET_DAY);
-mozjexl.addTransform("setMonth", SET_MONTH);
-mozjexl.addTransform("setYear", SET_YEAR);
+// Register all transforms using a data-driven approach
+const TRANSFORMS: [string, any][] = [
+  // String
+  ["upper", UPPER], ["lower", LOWER], ["capitalize", CAPITALIZE],
+  ["swapCase", SWAP_CASE], ["startsWith", STARTS_WITH], ["endsWith", ENDS_WITH],
+  ["indexOfChar", INDEX_OF_CHAR], ["trim", TRIM], ["ltrim", LTRIM],
+  ["rtrim", RTRIM], ["length", LENGTH], ["replace", REPLACE],
+  ["replaceAll", REPLACE_ALL], ["split", SPLIT], ["substring", SUBSTRING],
+  ["padStart", PAD_START], ["padEnd", PAD_END], ["parseInt", PARSE_INT],
+  ["parseFloat", PARSE_FLOAT], ["toBoolean", TO_BOOLEAN], ["reverse", REVERSE],
+  ["slugify", SLUGIFY], ["unslugify", UNSLUGIFY],
+  // Misc
+  ["forEach", FOREACH], ["jsonpath", JSONPATH], ["type", TYPE],
+  ["parseJson", PARSE_JSON], ["UUID", UUID],
+  // Array
+  ["pluck", PLUCK], ["size", SIZE], ["push", PUSH], ["pop", POP],
+  ["join", JOIN], ["slice", SLICE], ["reverseArray", REVERSE_ARRAY],
+  ["sortArray", SORT_ARRAY], ["range", RANGE], ["rangeRight", RANGE_RIGHT],
+  ["removeDuplicates", REMOVE_DUPLICATES], ["max", MAX], ["min", MIN],
+  // Object
+  ["keys", KEYS], ["values", VALUES], ["entries", ENTRIES], ["get", GET],
+  ["has", HAS], ["delete", DELETE], ["stringify", STRINGIFY],
+  ["deepMerge", DEEP_MERGE],
+  // Number
+  ["abs", ABS], ["ceil", CEIL], ["floor", FLOOR], ["round", ROUND],
+  ["random", RANDOM],
+  // Date
+  ["formatDateTime", FORMAT_DATE_TIME], ["convertDateTimeFormat", CONVERT_DATE_TIME_FORMAT],
+  ["now", NOW], ["utcNow", UTC_NOW], ["toUTC", TO_UTC], ["toLocal", TO_LOCAL],
+  ["toMillis", TO_MILLIS], ["getSeconds", GET_SECONDS], ["getTimeZone", GET_TIME_ZONE],
+  ["getMinutes", GET_MINUTES], ["getHours", GET_HOURS], ["getDay", GET_DAY],
+  ["getMonth", GET_MONTH], ["getYear", GET_YEAR], ["setSeconds", SET_SECONDS],
+  ["setTimeZone", SET_TIME_ZONE], ["setMinutes", SET_MINUTES], ["setHours", SET_HOURS],
+  ["setDay", SET_DAY], ["setMonth", SET_MONTH], ["setYear", SET_YEAR],
+];
 
+for (const [name, fn] of TRANSFORMS) {
+  mozjexl.addTransform(name, fn);
+}
 
-/**
- * This must be loaded into the `mozjexl` object last, which is why 
- * it is placed here.
- * 
- * Loading it last ensures that all dependencies or preceding configurations 
- * are already in place, maintaining the correct order of operations.
- */
-const EVALUATE_EXPRESSION = async (val: string, context: Record<any, any>) => {
-  if (typeof val === "string") {
+// evaluateExpression must be registered last since it depends on all other transforms
+const EVALUATE_EXPRESSION = async (val: string, context: Record<any, any>) =>
+  withString(val, "evaluateExpression", async (s) => {
     const regex = /{{\s*(.+?)\s*}}/g;
-    const parts = val.split(regex);
+    const parts = s.split(regex);
     for (let i = 1; i < parts.length; i += 2) {
       const result = await mozjexl.eval(parts[i], context);
-      if (typeof result !== "string") parts[i] = JSON.stringify(await mozjexl.eval(parts[i], context));
-      else parts[i] = await mozjexl.eval(parts[i], context);
+      parts[i] = typeof result === "string" ? result : JSON.stringify(result);
     }
     return parts.join("");
-  }
-  return {
-    [Errors.MethodNotDefinedForType]: `The ${val} of type ${getType(val)} has no method 'evaluateExpression'. <value> | evaluateExpression(context) is only supported for String`
-  };
-};
+  });
 
 mozjexl.addTransform("evaluateExpression", EVALUATE_EXPRESSION);
 
